@@ -1,0 +1,20 @@
+name: lint-forge
+version: "1.0"
+about: lint your git diffs
+author: Alex Ragone <ragonedk@gmail.com>
+
+settings:
+    - ColoredHelp
+
+args:
+    - commit_range:
+        help: Commit range provided to diff. Defaults to HEAD
+        index: 1
+    - linter:
+        help: The linter to use. Defaults to phpcs
+        short: l
+        long: linter
+        takes_value: true
+        possible_values:
+            - phpcs
+            - phpmd
