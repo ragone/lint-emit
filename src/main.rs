@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate clap;
+#[macro_use] extern crate clap;
 extern crate slog;
 extern crate slog_term;
 extern crate slog_async;
@@ -12,8 +11,9 @@ extern crate termion;
 use clap::App;
 use slog::{Level, Logger, Drain, info, debug, o};
 use slog_term::{TermDecorator, CompactFormat};
+use failure::Error;
 
-fn main() -> Result<(), lint_forge::Error> {
+fn main() -> Result<(), Error> {
     let yml = load_yaml!("cli.yml");
     let matches = App::from_yaml(yml).get_matches();
 

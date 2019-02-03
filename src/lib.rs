@@ -49,6 +49,8 @@ use std::process::Command;
 use std::path::PathBuf;
 use slog::{debug, trace};
 use std::fs;
+use failure::Error;
+use failure::Fail;
 
 /// Contains the line numbers which have changed for a given file
 #[derive(Debug)]
@@ -79,7 +81,6 @@ pub fn run(commit_range: &str, linters: Vec<&str>, logger: slog::Logger) -> Resu
         .map(|file| get_changed_lines(commit_range, file).unwrap())
         .collect();
 
-
     // Get the output from running the linters for each file
     let lint_messages: Vec<LintMessage> = diff_metas
         .into_iter()
@@ -104,12 +105,12 @@ fn get_lint_messages(linters: &Vec<&str>, diff_meta: &DiffMeta, logger: &slog::L
             _ => r""
         };
 
-        let re = Regex::new(regex).unwrap();
-        let output = get_lint_output(linter, &diff_meta.file).unwrap();
+        let re = Regex::new(regex)?;
+        let output = get_lint_output(linter, &diff_meta.file)?;
         trace!(logger, "Output = {:?}", output);
         for cap in re.captures_iter(&output) {
         trace!(logger, "Capture = {:#?}", cap);
-            if let Some(lint_message) = get_lint_messages_regex(linter, cap, diff_meta, logger) {
+            if let Some(lint_message) = get_lint_message(linter, cap, diff_meta, logger) {
                 lint_messages.push(lint_message);
             }
         }
@@ -117,14 +118,14 @@ fn get_lint_messages(linters: &Vec<&str>, diff_meta: &DiffMeta, logger: &slog::L
     Ok(lint_messages)
 }
 
-/// Get the lint messages
-fn get_lint_messages_regex(linter: &str, cap: regex::Captures, diff_meta: &DiffMeta, logger: &slog::Logger) -> Option<LintMessage> {
-    let message = cap.name("message").unwrap().as_str().to_owned();
+/// Get the lint message
+fn get_lint_message(linter: &str, cap: regex::Captures, diff_meta: &DiffMeta, logger: &slog::Logger) -> Option<LintMessage> {
+    let message = cap.name("message")?.as_str().to_owned();
 
-    let file = PathBuf::from(cap.name("file").unwrap().as_str());
+    let file = PathBuf::from(cap.name("file")?.as_str());
     trace!(logger, "Processing file {:?}", file);
 
-    let line = cap.name("line").unwrap().as_str().parse::<u32>().unwrap();
+    let line = cap.name("line")?.as_str().parse::<u32>().unwrap();
     trace!(logger, "Processing line {:?}", line);
 
     // Filter here
@@ -153,13 +154,13 @@ fn get_lint_output(linter: &str, file: &PathBuf) -> Result<String, Error> {
 }
 
 /// Return the line number for lines which have changed from `git diff`
-fn get_changed_lines_from_diff(hunk: String) -> Vec<u32> {
+fn get_changed_lines_from_diff(hunk: String) -> Result<Vec<u32>, Error> {
     let mut line_number = 0;
-    hunk.lines().fold(vec![], |mut changed_lines, line| {
+    let re = Regex::new(r"\+([0-9]+)")?;
+    let changed_lines = hunk.lines().fold(vec![], |mut changed_lines, line| {
         if line.starts_with("@@") {
             // This is the line where the diff starts
             // So lets get the line number
-            let re = Regex::new(r"\+([0-9]+)").unwrap();
             let start = re.find(&line).unwrap().as_str();
             line_number = start.parse().unwrap();
             line_number -= 1;
@@ -178,13 +179,14 @@ fn get_changed_lines_from_diff(hunk: String) -> Vec<u32> {
         }
 
         changed_lines
-    })
+    });
+    Ok(changed_lines)
 }
 
 /// Returns the changed line numbers, split by file path
 fn get_changed_lines(commit_range: &str, file: PathBuf) -> Result<DiffMeta, Error> {
     let diff = get_diff(commit_range, &file)?;
-    let changed_lines = get_changed_lines_from_diff(diff);
+    let changed_lines = get_changed_lines_from_diff(diff)?;
     let result = DiffMeta {
         file,
         changed_lines
@@ -204,8 +206,7 @@ fn get_diff(commit_range: &str, file: &PathBuf) -> Result<String, Error> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-/// Returns the changed files in a commit range using `git diff`
-fn get_changed_files(commit_range: &str) -> Result<Vec<PathBuf>, Error> {
+fn get_git_diff_output(commit_range: &str) -> Result<std::process::Output, Error> {
     let output = Command::new("git")
         .arg("diff")
         .arg(commit_range)
@@ -213,46 +214,34 @@ fn get_changed_files(commit_range: &str) -> Result<Vec<PathBuf>, Error> {
         .arg("--diff-filter=ACM")
         .output()?;
 
+    Ok(output)
+}
 
+/// Returns the changed files in a commit range using `git diff`
+fn get_changed_files(commit_range: &str) -> Result<Vec<PathBuf>, Error> {
+    let output = get_git_diff_output(commit_range)?;
+
+    // Convert the filepaths to absolute
     let result = String::from_utf8(output.stdout)?
         .lines()
-        .map(|line| {
-            fs::canonicalize(line).unwrap()
+        .filter_map(|line| {
+            fs::canonicalize(line).ok()
         })
         .collect();
 
     Ok(result)
 }
 
-#[derive(Debug)]
-pub enum Error {
+#[derive(Debug, Fail)]
+pub enum LintError {
+    #[fail(display = "invalid toolchain name")]
     IO,
+    #[fail(display = "invalid toolchain name")]
     Parse,
+    #[fail(display = "invalid toolchain name")]
     Regex,
+    #[fail(display = "invalid toolchain name")]
     Slog,
+    #[fail(display = "invalid toolchain name")]
     None
-}
-
-impl std::convert::From<std::io::Error> for Error {
-    fn from(_err: std::io::Error) -> Error {
-        Error::IO
-    }
-}
-
-impl std::convert::From<std::string::FromUtf8Error> for Error {
-    fn from(_err: std::string::FromUtf8Error) -> Error {
-        Error::Parse
-    }
-}
-
-impl std::convert::From<regex::Error> for Error {
-    fn from(_err: regex::Error) -> Error {
-        Error::Regex
-    }
-}
-
-impl std::convert::From<slog::Error> for Error {
-    fn from(_err: slog::Error) -> Error {
-        Error::Slog
-    }
 }
