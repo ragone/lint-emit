@@ -9,12 +9,21 @@ settings:
 args:
     - commit_range:
         help: Commit range provided to diff. Defaults to HEAD
+        default_value: "HEAD"
         index: 1
-    - linter:
-        help: The linter to use. Defaults to phpcs
+    - linters:
+        help: The linters to use. Defaults to phpcs
         short: l
-        long: linter
+        long: linters
+        default_value: "clippy"
         takes_value: true
+        multiple: true
         possible_values:
             - phpcs
             - phpmd
+            - clippy
+    - verbose:
+        short: v
+        long: verbose
+        help: Commit range provided to diff. Defaults to HEAD
+        multiple: true

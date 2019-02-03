@@ -1,9 +1,17 @@
 [package]
 name = "lint-forge"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Alex Ragone <alex.ragone@ezyvet.com>"]
 edition = "2018"
 
 [dependencies]
 clap = {version = "2", features = ["yaml"]}
 regex = "1"
+slog = {version = "2", features = ["max_level_trace", "release_max_level_warn"]}
+slog-term = "2"
+slog-async = "2"
+itertools = "0.8.0"
+colored = "1.7.0"
+walkdir = "2.2.7"
+tui = "0.3.0"
+termion = "1.5.1"

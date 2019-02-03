@@ -1,108 +1,45 @@
-// Using yaml requires calling a clap macro `load_yaml!()` so we must use the '#[macro_use]'
-// directive
 #[macro_use]
 extern crate clap;
-extern crate regex;
+extern crate slog;
+extern crate slog_term;
+extern crate slog_async;
+extern crate lint_forge;
+extern crate itertools;
+extern crate walkdir;
+extern crate tui;
+extern crate termion;
 
-use regex::Regex;
 use clap::App;
-use std::process::Command;
-use std::path::PathBuf;
+use slog::{Level, Logger, Drain, info, debug, o};
+use slog_term::{TermDecorator, CompactFormat};
 
-fn main() {
+fn main() -> Result<(), lint_forge::Error> {
     let yml = load_yaml!("cli.yml");
     let matches = App::from_yaml(yml).get_matches();
 
+    // Setup logging level
+    let min_log_level = match matches.occurrences_of("verbose") {
+        0 => Level::Error,   // Events that might still allow the application to continue running.
+        1 => Level::Warning, // Potentially harmful situations.
+        2 => Level::Info,    // Informational messages that highlight the progress of the application at coarse-grained level.
+        3 => Level::Debug,   // Fine-grained informational events that are most useful to debug an application.
+        _ => Level::Trace,   // Finer-grained informational events than DEBUG.
+    };
+
+    // Create logger
+    let decorator = TermDecorator::new().build();
+    let drain = CompactFormat::new(decorator).build().fuse();
+    let drain = slog_async::Async::new(drain).build().fuse();
+    let logger = Logger::root(drain.filter_level(min_log_level).fuse(), o!());
+    info!(logger, "{:#?} logging enabled", min_log_level);
+
     // Get commit range from args or default to HEAD
-    let commit_range = matches.value_of("commit_range").unwrap_or("HEAD");
+    let commit_range = matches.value_of("commit_range").unwrap();
+    debug!(logger, "Commit Range = {:#?}", commit_range);
 
-    println!("Commit range provided: {}", commit_range);
+    // Get the linters from args or default to [clippy]
+    let linters: Vec<_> = matches.values_of("linters").unwrap().collect();
+    debug!(logger, "Linters = {:#?}", linters);
 
-    let changed_files = get_changed_files(commit_range).unwrap();
-    let changed_file_line_map: Vec<Vec<String>> = changed_files
-        .iter()
-        .map(|file| {
-            get_changed_file_line_map(commit_range, &file).unwrap()
-        })
-        .collect();
-
-    dbg!(changed_file_line_map);
-}
-
-/// Return the lines which have changed from `git diff`
-fn get_changed_lines_from_diff(hunk: String) -> Vec<String> {
-    let mut line_number = 0;
-
-    hunk.lines().fold(vec![], |mut changed_lines, line| {
-        if line.starts_with("@@") {
-            let re = Regex::new(r"\+([0-9]+)").unwrap();
-            let matches = re.is_match(&line);
-            dbg!(matches);
-        }
-
-        if !line.starts_with("-") {
-            line_number += 1;
-
-            if line.starts_with("+") {
-                changed_lines.push(line_number.to_string());
-            }
-        }
-
-        changed_lines
-    })
-}
-
-/// Return the output of `git diff`
-fn get_diff(commit_range: &str, file: &PathBuf) -> Result<String, Error> {
-    let output = Command::new("git")
-        .arg("diff")
-        .arg(commit_range)
-        .arg(file)
-        .output()?;
-
-    Ok(String::from_utf8(output.stdout)?)
-}
-
-fn get_changed_file_line_map(commit_range: &str, file: &PathBuf) -> Result<Vec<String>, Error> {
-    let diff = get_diff(commit_range, file)?;
-    let changed_lines = get_changed_lines_from_diff(diff);
-
-    Ok(changed_lines)
-}
-
-/// Get the changed files in a commit range using `git diff`
-fn get_changed_files(commit_range: &str) -> Result<Vec<PathBuf>, Error> {
-    let output = Command::new("git")
-        .arg("diff")
-        .arg(commit_range)
-        .arg("--name-only")
-        .arg("--diff-filter=ACM")
-        .output()?;
-
-    let result = String::from_utf8(output.stdout)?
-        .lines()
-        .map(|line| {
-            PathBuf::from(line)
-        })
-        .collect();
-
-    Ok(result)
-}
-
-#[derive(Debug)]
-enum Error {
-    IOError,
-    ParseError
-}
-
-impl std::convert::From<std::io::Error> for Error {
-    fn from(_err: std::io::Error) -> Error {
-        Error::IOError
-    }
-}
-
-impl std::convert::From<std::string::FromUtf8Error> for Error {
-    fn from(_err: std::string::FromUtf8Error) -> Error {
-        Error::ParseError
-    }
+    lint_forge::run(commit_range, linters, logger)
 }
