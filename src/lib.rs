@@ -89,8 +89,8 @@ pub fn run(commit_range: &str, linters: Vec<&str>, logger: slog::Logger) -> Resu
 
     // Get the changed files and line numbers
     let diff_metas: Vec<DiffMeta> = changed_files
-        .into_iter()
-        .map(|file| get_changed_lines(commit_range, file).unwrap())
+        .par_iter()
+        .map(|file| get_changed_lines(commit_range, &file).unwrap())
         .collect();
     debug!(logger, "Diff Metas = {:#?}", diff_metas);
 
@@ -194,7 +194,6 @@ fn get_changed_lines_from_diff(hunk: String) -> Result<Vec<LineMeta>, Error> {
         if !line.starts_with('-') {
             // Increment the current line number if the line wasn't removed
             line_number += 1;
-
             if line.starts_with('+') {
                 // Sanitize the line
                 let source = sanitize.replace(line, "");
@@ -207,18 +206,17 @@ fn get_changed_lines_from_diff(hunk: String) -> Result<Vec<LineMeta>, Error> {
                 return changed_lines;
             }
         }
-
         changed_lines
     });
     Ok(changed_lines)
 }
 
 /// Returns the changed line numbers, split by file path
-fn get_changed_lines(commit_range: &str, file: PathBuf) -> Result<DiffMeta, Error> {
+fn get_changed_lines(commit_range: &str, file: &PathBuf) -> Result<DiffMeta, Error> {
     let diff = get_diff(commit_range, &file)?;
     let changed_lines = get_changed_lines_from_diff(diff)?;
     let result = DiffMeta {
-        file,
+        file: file.to_path_buf(),
         changed_lines
     };
 
