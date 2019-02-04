@@ -25,8 +25,8 @@ fn print_lint_message(lint_message: LintMessage, project_root: &PathBuf) {
     let source = lint_message.source;
     let message = lint_message.message;
     println!("{}:{}", file_name.green().bold(), line_number.dimmed());
+    println!("{} {}", ">>".blue(), message);
     println!("{}", source.dimmed());
-    println!("{}", message);
     println!("");
 }
 
@@ -44,3 +44,14 @@ fn get_project_root(file: PathBuf) -> PathBuf {
     let parent_file = file.parent().to_owned().unwrap().to_path_buf();
     get_project_root(parent_file)
 }
+
+// fn setup_spinner() ->
+//     // Setup spinner
+//     let spinner_style = ProgressStyle::default_spinner()
+//         .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ")
+//         .template("{prefix:.bold.dim} {spinner} {wide_msg}");
+
+//     println!(
+//         "{} {}Resolving packages...",
+//         "[1/4]".bold().dim(),
+//     );

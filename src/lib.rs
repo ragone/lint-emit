@@ -51,6 +51,10 @@ use slog::{debug, trace};
 use std::fs;
 use failure::Error;
 use failure::Fail;
+use indicatif::{ProgressBar};
+use colored::*;
+use rayon::prelude::*;
+
 
 /// Contains the line numbers which have changed for a given file
 #[derive(Debug)]
@@ -90,14 +94,19 @@ pub fn run(commit_range: &str, linters: Vec<&str>, logger: slog::Logger) -> Resu
         .collect();
     debug!(logger, "Diff Metas = {:#?}", diff_metas);
 
+    let pb = ProgressBar::new(diff_metas.len() as u64);
     // Get the output from running the linters for each file
     let lint_messages: Vec<LintMessage> = diff_metas
-        .into_iter()
+        .par_iter()
         .flat_map(|diff_meta| {
-            get_lint_messages(&linters, &diff_meta, &logger).unwrap()
+            let lint_messages = get_lint_messages(&linters, &diff_meta, &logger).unwrap();
+            pb.println(format!("{} finished {}", "[+]".green(), diff_meta.file.to_str().unwrap()));
+            pb.inc(1);
+            lint_messages
         })
         .collect();
     debug!(logger, "Lint Messages = {:#?}", lint_messages);
+    pb.finish_with_message("done");
 
     display::render(lint_messages);
 
@@ -242,15 +251,18 @@ fn get_git_diff_output(commit_range: &str) -> Result<std::process::Output, Error
 fn get_changed_files(commit_range: &str) -> Result<Vec<PathBuf>, Error> {
     let output = get_git_diff_output(commit_range)?;
 
-    // Convert the filepaths to absolute
-    let result = String::from_utf8(output.stdout)?
-        .lines()
-        .filter_map(|line| {
-            fs::canonicalize(line).ok()
-        })
-        .collect();
-
-    Ok(result)
+    match output.status.success() {
+        true => {
+            let result = String::from_utf8(output.stdout)?
+                .lines()
+                .filter_map(|line| {
+                    fs::canonicalize(line).ok()
+                })
+                .collect();
+            Ok(result)
+        },
+        false => panic!("Git error")
+    }
 }
 
 #[derive(Debug, Fail)]
