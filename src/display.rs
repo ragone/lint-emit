@@ -5,6 +5,9 @@ use walkdir::WalkDir;
 use std::path::PathBuf;
 
 pub fn render(lint_messages: Vec<LintMessage>) {
+    if lint_messages.len() == 0 {
+        println!("{}", "No errors found! Nice.".green().bold());
+    }
     // Group the ouput by file
     for (file, outputs) in &lint_messages.into_iter().group_by(|elt| elt.file.to_owned()) {
         let project_root = get_project_root(file);
@@ -19,9 +22,12 @@ pub fn render(lint_messages: Vec<LintMessage>) {
 fn print_lint_message(lint_message: LintMessage, project_root: &PathBuf) {
     let file_name = lint_message.file.strip_prefix(&project_root).unwrap().to_str().unwrap();
     let line_number = lint_message.line.to_string();
+    let source = lint_message.source;
     let message = lint_message.message;
     println!("{}:{}", file_name.green().bold(), line_number.dimmed());
+    println!("{}", source.dimmed());
     println!("{}", message);
+    println!("");
 }
 
 

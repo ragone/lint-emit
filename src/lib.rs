@@ -56,7 +56,14 @@ use failure::Fail;
 #[derive(Debug)]
 struct DiffMeta {
     file: PathBuf,
-    changed_lines: Vec<u32>
+    changed_lines: Vec<LineMeta>
+}
+
+/// Contains the changed lines and the snippets
+#[derive(Debug)]
+struct LineMeta {
+    line: u32,
+    source: String
 }
 
 /// Contains the lint message for a given file
@@ -65,6 +72,7 @@ pub struct LintMessage {
     linter: String,
     file: PathBuf,
     line: u32,
+    source: String,
     message: String
 }
 
@@ -80,6 +88,7 @@ pub fn run(commit_range: &str, linters: Vec<&str>, logger: slog::Logger) -> Resu
         .into_iter()
         .map(|file| get_changed_lines(commit_range, file).unwrap())
         .collect();
+    debug!(logger, "Diff Metas = {:#?}", diff_metas);
 
     // Get the output from running the linters for each file
     let lint_messages: Vec<LintMessage> = diff_metas
@@ -88,6 +97,7 @@ pub fn run(commit_range: &str, linters: Vec<&str>, logger: slog::Logger) -> Resu
             get_lint_messages(&linters, &diff_meta, &logger).unwrap()
         })
         .collect();
+    debug!(logger, "Lint Messages = {:#?}", lint_messages);
 
     display::render(lint_messages);
 
@@ -100,17 +110,18 @@ fn get_lint_messages(linters: &Vec<&str>, diff_meta: &DiffMeta, logger: &slog::L
     for linter in linters.into_iter() {
         let regex = match linter {
             &"clippy" => r"(?P<message>.*)\n.*--> (?P<file>.*):(?P<line>\d*):",
-            &"phpmd" => r"(?P<file>.*):(?P<line>\d*)\s*(?P<message>.*)",
+            &"phpmd" => r"(?P<file>.*):(?P<line>\d*)\\t(?P<message>.*)",
             &"phpcs" => r"(?P<file>.*):(?P<line>\d*):.*: (?P<message>.*)",
             _ => r""
         };
 
         let re = Regex::new(regex)?;
         let output = get_lint_output(linter, &diff_meta.file)?;
-        trace!(logger, "Output = {:?}", output);
+        // trace!(logger, "Output = {:?}", output);
         for cap in re.captures_iter(&output) {
         trace!(logger, "Capture = {:#?}", cap);
             if let Some(lint_message) = get_lint_message(linter, cap, diff_meta, logger) {
+                trace!(logger, "Adding = {:#?}", lint_message);
                 lint_messages.push(lint_message);
             }
         }
@@ -128,12 +139,15 @@ fn get_lint_message(linter: &str, cap: regex::Captures, diff_meta: &DiffMeta, lo
     let line = cap.name("line")?.as_str().parse::<u32>().unwrap();
     trace!(logger, "Processing line {:?}", line);
 
+    let line_meta = diff_meta.changed_lines.iter().find(|x| x.line == line);
+
     // Filter here
     trace!(logger, "For {:?}", diff_meta);
     if diff_meta.file == file
-        && diff_meta.changed_lines.contains(&line) {
+        && line_meta.is_some() {
             return Some(LintMessage {
                 linter: linter.to_owned(),
+                source: line_meta.unwrap().source.to_owned(),
                 message,
                 file,
                 line
@@ -154,9 +168,10 @@ fn get_lint_output(linter: &str, file: &PathBuf) -> Result<String, Error> {
 }
 
 /// Return the line number for lines which have changed from `git diff`
-fn get_changed_lines_from_diff(hunk: String) -> Result<Vec<u32>, Error> {
+fn get_changed_lines_from_diff(hunk: String) -> Result<Vec<LineMeta>, Error> {
     let mut line_number = 0;
     let re = Regex::new(r"\+([0-9]+)")?;
+    let sanitize = Regex::new(r"^[-+ ]\s*")?;
     let changed_lines = hunk.lines().fold(vec![], |mut changed_lines, line| {
         if line.starts_with("@@") {
             // This is the line where the diff starts
@@ -172,8 +187,14 @@ fn get_changed_lines_from_diff(hunk: String) -> Result<Vec<u32>, Error> {
             line_number += 1;
 
             if line.starts_with('+') {
+                // Sanitize the line
+                let source = sanitize.replace(line, "");
+
                 // Add the line number of the line which was added
-                changed_lines.push(line_number);
+                changed_lines.push(LineMeta {
+                    line: line_number,
+                    source: source.to_string()
+                });
                 return changed_lines;
             }
         }
@@ -234,14 +255,8 @@ fn get_changed_files(commit_range: &str) -> Result<Vec<PathBuf>, Error> {
 
 #[derive(Debug, Fail)]
 pub enum LintError {
-    #[fail(display = "invalid toolchain name")]
+    #[fail(display = "IO error")]
     IO,
-    #[fail(display = "invalid toolchain name")]
-    Parse,
-    #[fail(display = "invalid toolchain name")]
-    Regex,
-    #[fail(display = "invalid toolchain name")]
-    Slog,
-    #[fail(display = "invalid toolchain name")]
-    None
+    #[fail(display = "Parsing error")]
+    Parse
 }
