@@ -1,5 +1,5 @@
 clippy:
-  cmd: 'cargo check &>'
+  cmd: 'cargo check'
   regex: '(?P<message>.*)\n.*--> (?P<file>.*):(?P<line>\d*):'
 phpmd:
   cmd: 'phpmd {file} text cleancode,codesize,controversial,design,naming,unusedcode'
