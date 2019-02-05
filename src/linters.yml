@@ -1,0 +1,9 @@
+clippy:
+  cmd: 'cargo check &>'
+  regex: '(?P<message>.*)\n.*--> (?P<file>.*):(?P<line>\d*):'
+phpmd:
+  cmd: 'phpmd {file} text cleancode,codesize,controversial,design,naming,unusedcode'
+  regex: '(?P<file>.*):(?P<line>\d*)\\t(?P<message>.*)'
+phpcs:
+  cmd: 'phpcs {file} --report=emacs'
+  regex: '(?P<file>.*):(?P<line>\d*):.*: (?P<message>.*)'

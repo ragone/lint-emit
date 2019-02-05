@@ -42,24 +42,27 @@
 //!   - `phpmd`
 //!   - `phpcs`
 
-mod display;
-
 use regex::Regex;
 use std::process::Command;
 use std::path::PathBuf;
-use slog::{debug, trace};
+use slog::{trace};
 use std::fs;
 use failure::Error;
 use failure::Fail;
-use indicatif::{ProgressBar};
-use colored::*;
-use rayon::prelude::*;
+use regex::NoExpand;
 
+/// Contains config of the linter
+#[derive(Debug)]
+pub struct LinterConfig {
+    pub name: String,
+    pub cmd: String,
+    pub regex: String
+}
 
 /// Contains the line numbers which have changed for a given file
 #[derive(Debug)]
-struct DiffMeta {
-    file: PathBuf,
+pub struct DiffMeta {
+    pub file: PathBuf,
     changed_lines: Vec<LineMeta>
 }
 
@@ -74,62 +77,22 @@ struct LineMeta {
 #[derive(Debug)]
 pub struct LintMessage {
     linter: String,
-    file: PathBuf,
-    line: u32,
-    source: String,
-    message: String
-}
-
-/// Run the linters across the whole project and return the linting messages
-/// for just the changed lines
-pub fn run(commit_range: &str, linters: Vec<&str>, logger: slog::Logger) -> Result<(), Error> {
-    // Get the changed files
-    let changed_files = get_changed_files(commit_range)?;
-    debug!(logger, "Changed Files = {:#?}", changed_files);
-
-    // Get the changed files and line numbers
-    let diff_metas: Vec<DiffMeta> = changed_files
-        .par_iter()
-        .map(|file| get_changed_lines(commit_range, &file).unwrap())
-        .collect();
-    debug!(logger, "Diff Metas = {:#?}", diff_metas);
-
-    let pb = ProgressBar::new(diff_metas.len() as u64);
-    // Get the output from running the linters for each file
-    let lint_messages: Vec<LintMessage> = diff_metas
-        .par_iter()
-        .flat_map(|diff_meta| {
-            let lint_messages = get_lint_messages(&linters, &diff_meta, &logger).unwrap();
-            pb.println(format!("{} finished {}", "[+]".green(), diff_meta.file.to_str().unwrap()));
-            pb.inc(1);
-            lint_messages
-        })
-        .collect();
-    debug!(logger, "Lint Messages = {:#?}", lint_messages);
-    pb.finish_with_message("done");
-
-    display::render(lint_messages);
-
-    Ok(())
+    pub file: PathBuf,
+    pub line: u32,
+    pub source: String,
+    pub message: String
 }
 
 /// Return the output from running a linter on the whole project
-fn get_lint_messages(linters: &Vec<&str>, diff_meta: &DiffMeta, logger: &slog::Logger) -> Result<Vec<LintMessage>, Error> {
+pub fn get_lint_messages(linters: &Vec<LinterConfig>, diff_meta: &DiffMeta, logger: &slog::Logger) -> Result<Vec<LintMessage>, Error> {
     let mut lint_messages: Vec<LintMessage> = vec![];
     for linter in linters.into_iter() {
-        let regex = match linter {
-            &"clippy" => r"(?P<message>.*)\n.*--> (?P<file>.*):(?P<line>\d*):",
-            &"phpmd" => r"(?P<file>.*):(?P<line>\d*)\\t(?P<message>.*)",
-            &"phpcs" => r"(?P<file>.*):(?P<line>\d*):.*: (?P<message>.*)",
-            _ => r""
-        };
-
-        let re = Regex::new(regex)?;
-        let output = get_lint_output(linter, &diff_meta.file)?;
-        // trace!(logger, "Output = {:?}", output);
+        let re = Regex::new(&linter.regex)?;
+        let output = get_lint_output(&linter, &diff_meta.file)?;
+        trace!(logger, "Output = {:?}", output);
         for cap in re.captures_iter(&output) {
         trace!(logger, "Capture = {:#?}", cap);
-            if let Some(lint_message) = get_lint_message(linter, cap, diff_meta, logger) {
+            if let Some(lint_message) = get_lint_message(&linter, cap, diff_meta, logger) {
                 trace!(logger, "Adding = {:#?}", lint_message);
                 lint_messages.push(lint_message);
             }
@@ -139,7 +102,7 @@ fn get_lint_messages(linters: &Vec<&str>, diff_meta: &DiffMeta, logger: &slog::L
 }
 
 /// Get the lint message
-fn get_lint_message(linter: &str, cap: regex::Captures, diff_meta: &DiffMeta, logger: &slog::Logger) -> Option<LintMessage> {
+fn get_lint_message(linter: &LinterConfig, cap: regex::Captures, diff_meta: &DiffMeta, logger: &slog::Logger) -> Option<LintMessage> {
     let message = cap.name("message")?.as_str().to_owned();
 
     let file = PathBuf::from(cap.name("file")?.as_str());
@@ -155,7 +118,7 @@ fn get_lint_message(linter: &str, cap: regex::Captures, diff_meta: &DiffMeta, lo
     if diff_meta.file == file
         && line_meta.is_some() {
             return Some(LintMessage {
-                linter: linter.to_owned(),
+                linter: linter.name.to_string(),
                 source: line_meta.unwrap().source.to_owned(),
                 message,
                 file,
@@ -166,14 +129,28 @@ fn get_lint_message(linter: &str, cap: regex::Captures, diff_meta: &DiffMeta, lo
 }
 
 /// Return the output from running a linter on the file
-fn get_lint_output(linter: &str, file: &PathBuf) -> Result<String, Error> {
-    let output = match linter {
-        "clippy" => Command::new("cargo").arg("check").output()?.stderr,
-        "phpmd" => Command::new("phpmd").arg(file.to_str().unwrap()).arg("text").arg("cleancode,codesize,controversial,design,naming,unusedcode").output()?.stdout,
-        "phpcs" => Command::new("phpcs").arg(file.to_str().unwrap()).arg("--report=emacs").output()?.stdout,
-        _ => Command::new("cargo").arg("clippy").output()?.stderr
+fn get_lint_output(linter: &LinterConfig, file: &PathBuf) -> Result<String, Error> {
+    // Insert the file in the cmd
+    let file_re = Regex::new(r"\{file\}")?;
+    let cmd = file_re.replace(&linter.cmd, NoExpand(file.to_str().unwrap())).to_string();
+
+    // Get the args split by whitespace
+    let args: Vec<&str> = cmd.split_whitespace().collect();
+    let cmd_output = Command::new(&args[0])
+        .args(&args[1..])
+        .output()?;
+
+    // Figure where the output is
+    let stdout = cmd_output.stdout;
+    let stderr = cmd_output.stderr;
+
+    let result = if stdout.is_empty() {
+        stderr
+    } else {
+        stdout
     };
-    Ok(String::from_utf8(output)?)
+
+    Ok(String::from_utf8(result)?)
 }
 
 /// Return the line number for lines which have changed from `git diff`
@@ -212,7 +189,7 @@ fn get_changed_lines_from_diff(hunk: String) -> Result<Vec<LineMeta>, Error> {
 }
 
 /// Returns the changed line numbers, split by file path
-fn get_changed_lines(commit_range: &str, file: &PathBuf) -> Result<DiffMeta, Error> {
+pub fn get_changed_lines(commit_range: &str, file: &PathBuf) -> Result<DiffMeta, Error> {
     let diff = get_diff(commit_range, &file)?;
     let changed_lines = get_changed_lines_from_diff(diff)?;
     let result = DiffMeta {
@@ -246,7 +223,7 @@ fn get_git_diff_output(commit_range: &str) -> Result<std::process::Output, Error
 }
 
 /// Returns the changed files in a commit range using `git diff`
-fn get_changed_files(commit_range: &str) -> Result<Vec<PathBuf>, Error> {
+pub fn get_changed_files(commit_range: &str) -> Result<Vec<PathBuf>, Error> {
     let output = get_git_diff_output(commit_range)?;
 
     match output.status.success() {
