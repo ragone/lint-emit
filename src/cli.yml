@@ -1,6 +1,6 @@
 name: lint-forge
 version: "1.0"
-about: lint your git diffs
+about: Lint your git diffs!
 author: Alex Ragone <ragonedk@gmail.com>
 
 settings:
@@ -8,11 +8,11 @@ settings:
 
 args:
     - commit_range:
-        help: Commit range provided to diff. Defaults to HEAD
+        help: Commit range provided to diff.
         default_value: "HEAD"
         index: 1
     - linters:
-        help: The linters to use. Defaults to phpcs
+        help: The linters to use.
         short: l
         long: linters
         default_value: "clippy"
@@ -25,5 +25,5 @@ args:
     - verbose:
         short: v
         long: verbose
-        help: Commit range provided to diff. Defaults to HEAD
+        help: Control the output verbosity
         multiple: true
