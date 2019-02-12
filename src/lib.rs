@@ -56,7 +56,9 @@ use regex::NoExpand;
 pub struct LinterConfig {
     pub name: String,
     pub cmd: String,
-    pub regex: String
+    pub args: Vec<String>,
+    pub regex: String,
+    pub ext: Vec<String>
 }
 
 /// Contains the line numbers which have changed for a given file
@@ -84,7 +86,7 @@ pub struct LintMessage {
 }
 
 /// Return the output from running a linter on the whole project
-pub fn get_lint_messages(linters: &Vec<LinterConfig>, diff_meta: &DiffMeta, logger: &slog::Logger) -> Result<Vec<LintMessage>, Error> {
+pub fn get_lint_messages(linters: &Vec<&LinterConfig>, diff_meta: &DiffMeta, logger: &slog::Logger) -> Result<Vec<LintMessage>, Error> {
     let mut lint_messages: Vec<LintMessage> = vec![];
     for linter in linters.into_iter() {
         let re = Regex::new(&linter.regex)?;
@@ -132,12 +134,15 @@ fn get_lint_message(linter: &LinterConfig, cap: regex::Captures, diff_meta: &Dif
 fn get_lint_output(linter: &LinterConfig, file: &PathBuf) -> Result<String, Error> {
     // Insert the file in the cmd
     let file_re = Regex::new(r"\{file\}")?;
-    let cmd = file_re.replace(&linter.cmd, NoExpand(file.to_str().unwrap())).to_string();
+    let args: Vec<String> = linter
+        .args
+        .iter()
+        .map(|arg| file_re.replace(&arg, NoExpand(file.to_str().unwrap())).to_string())
+        .collect();
 
     // Get the args split by whitespace
-    let args: Vec<&str> = cmd.split_whitespace().collect();
-    let cmd_output = Command::new(&args[0])
-        .args(&args[1..])
+    let cmd_output = Command::new(&linter.cmd)
+        .args(args)
         .output()?;
 
     // Figure where the output is

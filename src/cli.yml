@@ -15,7 +15,6 @@ args:
         help: The linters to use.
         short: l
         long: linters
-        default_value: "clippy"
         takes_value: true
         multiple: true
         possible_values:

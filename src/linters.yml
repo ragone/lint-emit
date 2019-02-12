@@ -1,9 +1,27 @@
+# Rust
 clippy:
-  cmd: 'cargo check'
+  cmd: 'cargo'
+  args:
+    - 'check'
   regex: '(?P<message>.*)\n.*--> (?P<file>.*):(?P<line>\d*):'
+  ext:
+    - rs
+
+# PHP
 phpmd:
-  cmd: 'phpmd {file} text cleancode,codesize,controversial,design,naming,unusedcode'
+  cmd: 'phpmd'
+  args:
+    - '{file}'
+    - 'text'
+    - 'cleancode,codesize,controversial,design,naming,unusedcode'
   regex: '(?P<file>.*):(?P<line>\d*)\\t(?P<message>.*)'
+  ext:
+    - php
 phpcs:
-  cmd: 'phpcs {file} --report=emacs'
+  cmd: 'pdhpcs'
+  args:
+    - '{file}'
+    - '--report=emacs'
   regex: '(?P<file>.*):(?P<line>\d*):.*: (?P<message>.*)'
+  ext:
+    - php
