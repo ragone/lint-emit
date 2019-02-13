@@ -24,8 +24,9 @@ fn print_lint_message(lint_message: LintMessage, project_root: &PathBuf) {
     let line_number = lint_message.line.to_string();
     let source = lint_message.source;
     let message = lint_message.message;
+    let linter = lint_message.linter;
     println!("{}:{}", file_name.green().bold(), line_number.dimmed());
-    println!("{} {}", ">>".blue(), message);
+    println!("{}{}{} {}", "[", linter.blue(), "]", message);
     println!("{}", source.dimmed());
     println!("");
 }

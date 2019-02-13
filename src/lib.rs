@@ -78,7 +78,7 @@ struct LineMeta {
 /// Contains the lint message for a given file
 #[derive(Debug)]
 pub struct LintMessage {
-    linter: String,
+    pub linter: String,
     pub file: PathBuf,
     pub line: u32,
     pub source: String,
