@@ -7,6 +7,17 @@ clippy:
   ext:
     - rs
 
+# Javascript
+eslint:
+  cmd: 'eslint'
+  args:
+    - '{file}'
+    - '-f=compact'
+  regex: '(?P<file>.*): line (?P<line>\d*), col \d*, (?P<message>.*)'
+  ext:
+    - js
+    - jsx
+
 # PHP
 phpmd:
   cmd: 'phpmd'

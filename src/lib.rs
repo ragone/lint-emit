@@ -4,7 +4,7 @@
 //! When working with legacy code, we often have to make changes to very large files (which would be too troublesome to fix all lint errors)
 //! and thus it would be good to lint only the lines changed and not the entire file.
 //!
-//! `lint-forge` receives a commit range and uses the specified linters (defaults to `clippy`) to lint the changed files and filter only the errors introduced in the commit range (and nothing more).
+//! `lint-emit` receives a commit range and uses the specified linters (defaults to `clippy`) to lint the changed files and filter only the errors introduced in the commit range (and nothing more).
 //!
 //! # Usage
 //! ### Install
@@ -14,25 +14,25 @@
 //!
 //! ### Lint the last commit
 //! ```shell
-//! $ lint-forge HEAD^..HEAD
+//! $ lint-emit HEAD^..HEAD
 //! ```
 //!
 //! # Examples
 //! ### Lint the last 3 commits
 //! ```shell
-//! $ lint-forge HEAD~3..HEAD
+//! $ lint-emit HEAD~3..HEAD
 //! ```
 //!
 //! ### Lint local changes that are not yet committed
 //! ```shell
-//! $ lint-forge HEAD
+//! $ lint-emit HEAD
 //! # or
-//! $ lint-forge
+//! $ lint-emit
 //! ```
 //!
 //! ### Lint using `phpmd` and `phpcs`
 //! ```shell
-//! $ lint-forge --linters phpmd phpcs
+//! $ lint-emit --linters phpmd phpcs
 //! ```
 //!
 //! # Compatible Linters
@@ -107,7 +107,12 @@ pub fn get_lint_messages(linters: &Vec<&LinterConfig>, diff_meta: &DiffMeta, log
 fn get_lint_message(linter: &LinterConfig, cap: regex::Captures, diff_meta: &DiffMeta, logger: &slog::Logger) -> Option<LintMessage> {
     let message = cap.name("message")?.as_str().to_owned();
 
-    let file = PathBuf::from(cap.name("file")?.as_str());
+    let file_name = match cap.name("file") {
+        Some(file) => file.as_str(),
+        None => diff_meta.file.to_str().unwrap()
+    };
+
+    let file = PathBuf::from(file_name);
     trace!(logger, "Processing file {:?}", file);
 
     let line = cap.name("line")?.as_str().parse::<u32>().unwrap();

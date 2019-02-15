@@ -1,4 +1,4 @@
-name: lint-forge
+name: lint-emit
 version: "1.0"
 about: Lint your git diffs!
 author: Alex Ragone <ragonedk@gmail.com>
@@ -17,10 +17,11 @@ args:
         long: linters
         takes_value: true
         multiple: true
-        possible_values:
-            - phpcs
-            - phpmd
-            - clippy
+    - config:
+        short: c
+        long: config
+        help: The YAML config file location
+        default_value: "HEAD"
     - verbose:
         short: v
         long: verbose

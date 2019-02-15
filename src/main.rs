@@ -1,34 +1,64 @@
-#[macro_use] extern crate clap;
+extern crate clap;
 extern crate slog;
 extern crate slog_term;
 extern crate slog_async;
-extern crate lint_forge;
+extern crate lint_emit;
 extern crate itertools;
 extern crate walkdir;
 extern crate tui;
 extern crate termion;
+extern crate serde_yaml;
 
 mod display;
 
-use clap::App;
+use clap::{Arg, App};
 use std::process::{Command, Stdio};
 use slog::{Level, Logger, Drain, info, debug, trace, o};
 use slog_term::{TermDecorator, CompactFormat};
 use failure::Error;
-use lint_forge::*;
-use std::path::PathBuf;
+use lint_emit::*;
 use indicatif::{ProgressBar};
 use rayon::prelude::*;
 use colored::*;
 use itertools::*;
+use std::fs::File;
 
 fn main() -> Result<(), Error> {
-    let yml = load_yaml!("cli.yml");
-    let linters_yml = load_yaml!("linters.yml");
-    let matches = App::from_yaml(yml).get_matches();
+    // Get the config
+    let file = File::open("/home/ragone/Developer/lint-emit/src/linters.yml")?;
+    let linters_yml: serde_yaml::Value = serde_yaml::from_reader(file)?;
+    let linters_map = linters_yml.as_mapping().unwrap();
+    let possible_values: Vec<&str> = linters_map.iter().map(|(key, _)| key.as_str().unwrap()).collect();
+    let matches = App::new("lint-emit")
+        .version("1.0")
+        .author("Alex Ragone <ragonedk@gmail.com>")
+        .about("Lint your git diffs!")
+        .arg(Arg::with_name("COMMIT_RANGE")
+             .short("c")
+             .long("config")
+             .default_value("HEAD")
+             .help("Commit range provided to diff")
+             .index(1))
+        .arg(Arg::with_name("LINTERS")
+             .short("l")
+             .long("linters")
+             .help("The linters to use")
+             .possible_values(&possible_values)
+             .takes_value(true)
+             .multiple(true))
+        .arg(Arg::with_name("CONFIG")
+             .short("c")
+             .long("config")
+             .help("The YAML config file location"))
+        .arg(Arg::with_name("VERBOSE")
+             .short("v")
+             .long("verbose")
+             .help("Control the output verbosity")
+             .multiple(true))
+        .get_matches();
 
     // Setup logging level
-    let min_log_level = match matches.occurrences_of("verbose") {
+    let min_log_level = match matches.occurrences_of("VERBOSE") {
         0 => Level::Error,   // Events that might still allow the application to continue running.
         1 => Level::Warning, // Potentially harmful situations.
         2 => Level::Info,    // Informational messages that highlight the progress of the application at coarse-grained level.
@@ -44,18 +74,13 @@ fn main() -> Result<(), Error> {
     info!(logger, "{:#?} logging enabled", min_log_level);
 
     // Get commit range from args or default to HEAD
-    let commit_range = matches.value_of("commit_range").unwrap();
+    let commit_range = matches.value_of("COMMIT_RANGE").unwrap();
     debug!(logger, "Commit Range = {:#?}", commit_range);
 
     // Get the linters from args or default to all linters
-    let linters: Vec<String> = match matches.values_of("linters") {
+    let linters: Vec<String> = match matches.values_of("LINTERS") {
         Some(linters_map) => linters_map.map(|linter| linter.to_owned()).collect(),
-        None => linters_yml
-            .as_hash()
-            .unwrap()
-            .keys()
-            .filter_map(|linter| linter.clone().into_string())
-            .collect()
+        None => possible_values.into_iter().map(|key| key.to_owned()).collect()
     };
     debug!(logger, "Linters = {:#?}", linters);
 
@@ -63,18 +88,20 @@ fn main() -> Result<(), Error> {
     let linter_configs: Vec<LinterConfig> = linters
         .par_iter()
         .map(|linter| {
-            let config = linters_yml[linter.as_str()].clone();
-            let cmd = config["cmd"].clone().into_string().unwrap();
-            let regex = config["regex"].clone().into_string().unwrap();
+            let config = &linters_yml[linter.as_str()];
+            let cmd = config["cmd"].as_str().unwrap().to_owned();
+            let regex = config["regex"].as_str().unwrap().to_owned();
             let ext: Vec<String> = config["ext"]
-                .clone()
+                .as_sequence()
+                .unwrap()
                 .into_iter()
-                .filter_map(|ext| ext.into_string())
+                .map(|ext| ext.as_str().unwrap().to_owned())
                 .collect();
             let args: Vec<String> = config["args"]
-                .clone()
+                .as_sequence()
+                .unwrap()
                 .into_iter()
-                .filter_map(|arg| arg.into_string())
+                .map(|arg| arg.as_str().unwrap().to_owned())
                 .collect();
             LinterConfig {
                 name: linter.to_owned(),
@@ -142,20 +169,20 @@ fn run(commit_range: &str, linters: Vec<LinterConfig>, logger: slog::Logger) -> 
             match valid_linters.is_empty() {
                 false => {
                     let linter_str = valid_linters.iter().map(|linter| &linter.name).join(", ");
-                    pb.println(format!("{} .{} files with: {}", "Processing".blue(), ext.bold(), linter_str.bold()));
+                    pb.println(format!("{} [.{}] Linters: {}", "Processing".blue(), ext.bold(), linter_str.bold()));
                     diff_metas
                         .collect::<Vec<&DiffMeta>>()
                         .par_iter()
                         .flat_map(|diff_meta| {
                             let lint_messages = get_lint_messages_for_file(&diff_meta, &valid_linters, &logger);
-                            pb.println(format!("{} {}", "Finished".green(), diff_meta.file.to_str().unwrap()));
+                            pb.println(format!("{} {}", "✓".green(), diff_meta.file.to_str().unwrap().dimmed()));
                             pb.inc(1);
                             lint_messages
                         })
                         .collect::<Vec<LintMessage>>()
                 },
                 true => {
-                    pb.println(format!("{} No linters found for .{}", "Skipping".yellow(), ext.bold()));
+                    pb.println(format!("{}   [.{}] No linters found", "Skipping".yellow(), ext.bold()));
                     vec![]
                 }
             }

@@ -42,7 +42,6 @@ fn print_lint_message(lint_messages: Vec<LintMessage>, line: u32) {
                 .into_iter()
                 .for_each(|lint_message| {
                     let message = lint_message.message;
-                    let linter = lint_message.linter;
                     println!("{} {}", "-->".blue(), message.bold());
                 });
         });
