@@ -7,7 +7,7 @@ authors = ["Alex Ragone <alex.ragone@ezyvet.com>"]
 edition = "2018"
 
 [dependencies]
-clap = {version = "2", features = ["yaml"]}
+clap = "2"
 regex = "1"
 slog = {version = "2", features = ["max_level_trace", "release_max_level_warn"]}
 slog-term = "2"
