@@ -35,7 +35,7 @@ struct Config {
 fn main() -> Result<(), Error> {
     // Determine if a config file exists, otherwise create it
     let xdg_dirs = xdg::BaseDirectories::with_prefix("lint-emit").unwrap();
-    let config_path = match xdg_dirs.find_config_file("config.yml") {
+    let config_path = match xdg_dirs.find_config_file("config.toml") {
         Some(file_path) => file_path,
         None => {
             // Get the default config
@@ -73,11 +73,12 @@ fn main() -> Result<(), Error> {
             };
 
             // Create config file from selection
-            let config_path = xdg_dirs.place_config_file("config.yml")
+            let config_path = xdg_dirs.place_config_file("config.toml")
                                       .expect("Cannot create configuration directory");
 
             let mut config_file = fs::File::create(config_path.clone())?;
             write!(&mut config_file, "{}", toml::to_string(&new_config)?)?;
+            println!("Successfully wrote configuration file to {:?}", config_path);
 
             config_path
         }
