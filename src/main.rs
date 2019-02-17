@@ -12,7 +12,7 @@ extern crate toml;
 
 mod display;
 
-use clap::{Arg, App};
+use clap::{Arg, App, AppSettings};
 use std::process::{Command, Stdio};
 use slog::{Level, Logger, Drain, info, debug, trace, o};
 use slog_term::{TermDecorator, CompactFormat};
@@ -93,6 +93,7 @@ fn main() -> Result<(), Error> {
         .version("0.3")
         .author("Alex Ragone <ragonedk@gmail.com>")
         .about("Lint your git diffs!")
+        .setting(AppSettings::ColoredHelp)
         .arg(Arg::with_name("COMMIT_RANGE")
              .short("c")
              .long("config")
