@@ -1,0 +1,30 @@
+# Rust
+[[linters]]
+name = "clippy"
+cmd = "cargo"
+args = ["check"]
+regex = '(?P<message>.*)\n.*--> (?P<file>.*):(?P<line>\d*):'
+ext = ["rs"]
+
+# Javascript
+[[linters]]
+name = "eslint"
+cmd = "eslint"
+args = ["{file}", "-f=compact"]
+regex = '(?P<file>.*): line (?P<line>\d*), col \d*, (?P<message>.*)'
+ext = ["js", "jsx"]
+
+# PHP
+[[linters]]
+name = "phpmd"
+cmd = "phpmd"
+args = ["{file}", "text", "cleancode,codesize,controversial,design,naming,unusedcode"]
+regex = '(?P<file>.*):(?P<line>\d*)\t(?P<message>.*)'
+ext = ["php"]
+
+[[linters]]
+name = "phpcs"
+cmd = "phpcs"
+args = ["{file}", "-report=emacs"]
+regex = '(?P<file>.*):(?P<line>\d*):.*: (?P<message>.*)'
+ext = ["php"]

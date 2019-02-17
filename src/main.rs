@@ -5,9 +5,10 @@ extern crate slog_async;
 extern crate lint_emit;
 extern crate itertools;
 extern crate walkdir;
-extern crate tui;
-extern crate termion;
-extern crate serde_yaml;
+extern crate serde;
+extern crate dialoguer;
+extern crate xdg;
+extern crate toml;
 
 mod display;
 
@@ -21,16 +22,74 @@ use indicatif::{ProgressBar};
 use rayon::prelude::*;
 use colored::*;
 use itertools::*;
-use std::fs::File;
+use std::fs;
+use dialoguer::{theme::ColorfulTheme, Checkboxes};
+use serde::{Serialize, Deserialize};
+use std::io::Write;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Config {
+    linters: Option<Vec<LinterConfig>>
+}
 
 fn main() -> Result<(), Error> {
+    // Determine if a config file exists, otherwise create it
+    let xdg_dirs = xdg::BaseDirectories::with_prefix("lint-emit").unwrap();
+    let config_path = match xdg_dirs.find_config_file("config.yml") {
+        Some(file_path) => file_path,
+        None => {
+            // Get the default config
+            let default_config: Config = toml::from_str(include_str!("default_config.yml"))?;
+            let linters = default_config.linters.unwrap();
+
+            // Prompt user to select linters
+            let linter_names: Vec<&str> = linters
+                .iter()
+                .map(|linter| linter.name.as_str())
+                .collect();
+
+            let selections = Checkboxes::with_theme(&ColorfulTheme::default())
+                .with_prompt("Choose linters [Press SPACE to select]")
+                .items(&linter_names)
+                .interact()
+                .unwrap();
+
+            let selected_names: Vec<&str> = selections
+                .into_iter()
+                .filter_map(|selection| linter_names.get(selection))
+                .map(|selection| *selection)
+                .collect();
+
+            let selected_linters: Vec<LinterConfig> = linters
+                .clone()
+                .into_iter()
+                .filter(|linter| {
+                    selected_names.contains(&linter.name.as_str())
+                })
+                .collect();
+
+            let new_config = Config {
+                linters: Some(selected_linters)
+            };
+
+            // Create config file from selection
+            let config_path = xdg_dirs.place_config_file("config.yml")
+                                      .expect("Cannot create configuration directory");
+
+            let mut config_file = fs::File::create(config_path.clone())?;
+            write!(&mut config_file, "{}", toml::to_string(&new_config)?)?;
+
+            config_path
+        }
+    };
+
     // Get the config
-    let file = File::open("/home/ragone/Developer/lint-emit/src/linters.yml")?;
-    let linters_yml: serde_yaml::Value = serde_yaml::from_reader(file)?;
-    let linters_map = linters_yml.as_mapping().unwrap();
-    let possible_values: Vec<&str> = linters_map.iter().map(|(key, _)| key.as_str().unwrap()).collect();
+    let config_string = fs::read_to_string(config_path).expect("Unable to read file");
+    let config: Config = toml::from_str(&config_string)?;
+    let linters = config.linters.unwrap();
+    let possible_values: Vec<&str> = linters.iter().map(|linter| linter.name.as_str()).collect();
     let matches = App::new("lint-emit")
-        .version("1.0")
+        .version("0.3")
         .author("Alex Ragone <ragonedk@gmail.com>")
         .about("Lint your git diffs!")
         .arg(Arg::with_name("COMMIT_RANGE")
@@ -78,37 +137,21 @@ fn main() -> Result<(), Error> {
     debug!(logger, "Commit Range = {:#?}", commit_range);
 
     // Get the linters from args or default to all linters
-    let linters: Vec<String> = match matches.values_of("LINTERS") {
-        Some(linters_map) => linters_map.map(|linter| linter.to_owned()).collect(),
-        None => possible_values.into_iter().map(|key| key.to_owned()).collect()
-    };
+    let linter_args: Vec<String> = matches.values_of("LINTERS")
+                                          .unwrap_or_default()
+                                          .map(|linter| linter.to_owned())
+                                          .collect();
+
     debug!(logger, "Linters = {:#?}", linters);
 
     // Create LinterConfigs for linters
     let linter_configs: Vec<LinterConfig> = linters
-        .par_iter()
-        .map(|linter| {
-            let config = &linters_yml[linter.as_str()];
-            let cmd = config["cmd"].as_str().unwrap().to_owned();
-            let regex = config["regex"].as_str().unwrap().to_owned();
-            let ext: Vec<String> = config["ext"]
-                .as_sequence()
-                .unwrap()
-                .into_iter()
-                .map(|ext| ext.as_str().unwrap().to_owned())
-                .collect();
-            let args: Vec<String> = config["args"]
-                .as_sequence()
-                .unwrap()
-                .into_iter()
-                .map(|arg| arg.as_str().unwrap().to_owned())
-                .collect();
-            LinterConfig {
-                name: linter.to_owned(),
-                cmd,
-                args,
-                regex,
-                ext
+        .into_iter()
+        .filter(|linter_config| {
+            if !linter_args.is_empty() {
+                linter_args.contains(&linter_config.name)
+            } else {
+                true
             }
         })
         .filter(|linter_config| {

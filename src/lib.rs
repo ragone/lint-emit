@@ -50,9 +50,10 @@ use std::fs;
 use failure::Error;
 use failure::Fail;
 use regex::NoExpand;
+use serde::{Serialize, Deserialize};
 
 /// Contains config of the linter
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LinterConfig {
     pub name: String,
     pub cmd: String,
