@@ -25,6 +25,6 @@ ext = ["php"]
 [[linters]]
 name = "phpcs"
 cmd = "phpcs"
-args = ["{file}", "-report=emacs"]
+args = ["{file}", "--report=emacs"]
 regex = '(?P<file>.*):(?P<line>\d*):.*: (?P<message>.*)'
 ext = ["php"]
