@@ -82,7 +82,7 @@ fn main() -> Result<(), Error> {
         Some(file_path) => file_path,
         None => {
             // Get the default config
-            let default_config: Config = toml::from_str(include_str!("default_config.yml"))?;
+            let default_config: Config = toml::from_str(include_str!("default_config.toml"))?;
             let linters = default_config.linters.unwrap();
 
             // Prompt user to select linters
