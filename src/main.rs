@@ -54,14 +54,14 @@ extern crate dialoguer;
 extern crate xdg;
 extern crate toml;
 
-pub mod display;
-pub mod lint;
 pub mod config;
+mod lint;
+mod display;
+mod logger;
 
 use clap::{Arg, App, AppSettings};
 use std::process::{Command, Stdio};
-use slog::{Level, Logger, Drain, info, debug, trace, o};
-use slog_term::{TermDecorator, CompactFormat};
+use slog::{debug, trace};
 use failure::Error;
 use indicatif::{ProgressBar};
 use rayon::prelude::*;
@@ -69,6 +69,7 @@ use colored::*;
 use itertools::*;
 use lint::*;
 use config::*;
+use logger::*;
 
 fn main() -> Result<(), Error> {
     let config = get_config()?;
@@ -99,21 +100,8 @@ fn main() -> Result<(), Error> {
              .multiple(true))
         .get_matches();
 
-    // Setup logging level
-    let min_log_level = match matches.occurrences_of("VERBOSE") {
-        0 => Level::Error,   // Events that might still allow the application to continue running.
-        1 => Level::Warning, // Potentially harmful situations.
-        2 => Level::Info,    // Informational messages that highlight the progress of the application at coarse-grained level.
-        3 => Level::Debug,   // Fine-grained informational events that are most useful to debug an application.
-        _ => Level::Trace,   // Finer-grained informational events than DEBUG.
-    };
-
-    // Create logger
-    let decorator = TermDecorator::new().build();
-    let drain = CompactFormat::new(decorator).build().fuse();
-    let drain = slog_async::Async::new(drain).build().fuse();
-    let logger = Logger::root(drain.filter_level(min_log_level).fuse(), o!());
-    info!(logger, "{:#?} logging enabled", min_log_level);
+    let verbosity = matches.occurrences_of("VERBOSE");
+    let logger = setup_logger(verbosity);
 
     // Get commit range from args or default to HEAD
     let commit_range = matches.value_of("COMMIT_RANGE").unwrap();
