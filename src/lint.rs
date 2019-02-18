@@ -166,7 +166,7 @@ pub fn get_changed_lines(commit_range: &str, file: &PathBuf) -> Result<DiffMeta,
     Ok(result)
 }
 
-/// Return the output of `git diff`
+/// Returns the output of `git diff`
 fn get_diff(commit_range: &str, file: &PathBuf) -> Result<String, Error> {
     let output = Command::new("git")
         .arg("diff")
@@ -177,7 +177,8 @@ fn get_diff(commit_range: &str, file: &PathBuf) -> Result<String, Error> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
-fn get_git_diff_output(commit_range: &str) -> Result<std::process::Output, Error> {
+/// Returns the paths for changed or added file
+fn get_diff_file_paths(commit_range: &str) -> Result<std::process::Output, Error> {
     let output = Command::new("git")
         .arg("diff")
         .arg(commit_range)
@@ -190,14 +191,14 @@ fn get_git_diff_output(commit_range: &str) -> Result<std::process::Output, Error
 
 /// Returns the changed files in a commit range using `git diff`
 pub fn get_changed_files(commit_range: &str) -> Result<Vec<PathBuf>, Error> {
-    let output = get_git_diff_output(commit_range)?;
+    let file_paths = get_diff_file_paths(commit_range)?;
 
-    match output.status.success() {
+    match file_paths.status.success() {
         true => {
-            let result = String::from_utf8(output.stdout)?
+            let result = String::from_utf8(file_paths.stdout)?
                 .lines()
-                .filter_map(|line| {
-                    fs::canonicalize(line).ok()
+                .filter_map(|file_path| {
+                    fs::canonicalize(file_path).ok()
                 })
                 .collect();
             Ok(result)

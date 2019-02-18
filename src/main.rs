@@ -54,9 +54,9 @@ extern crate dialoguer;
 extern crate xdg;
 extern crate toml;
 
-mod display;
-mod lint;
-mod config;
+pub mod display;
+pub mod lint;
+pub mod config;
 
 use clap::{Arg, App, AppSettings};
 use std::process::{Command, Stdio};
