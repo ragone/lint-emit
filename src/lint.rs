@@ -1,54 +1,9 @@
-//! This tool aims to run multiple linters on a commit range compatible with `git`.
-//!
-//! Linters are great tools to enforce code style in your code, but it has some limitations: it can only lint entire files.
-//! When working with legacy code, we often have to make changes to very large files (which would be too troublesome to fix all lint errors)
-//! and thus it would be good to lint only the lines changed and not the entire file.
-//!
-//! `lint-emit` receives a commit range and uses the specified linters (defaults to `clippy`) to lint the changed files and filter only the errors introduced in the commit range (and nothing more).
-//!
-//! # Usage
-//! ### Install
-//! ```shell
-//! $ cargo build --release
-//! ```
-//!
-//! ### Lint the last commit
-//! ```shell
-//! $ lint-emit HEAD^..HEAD
-//! ```
-//!
-//! # Examples
-//! ### Lint the last 3 commits
-//! ```shell
-//! $ lint-emit HEAD~3..HEAD
-//! ```
-//!
-//! ### Lint local changes that are not yet committed
-//! ```shell
-//! $ lint-emit HEAD
-//! # or
-//! $ lint-emit
-//! ```
-//!
-//! ### Lint using `phpmd` and `phpcs`
-//! ```shell
-//! $ lint-emit --linters phpmd phpcs
-//! ```
-//!
-//! # Compatible Linters
-//! - Rust
-//!   - `clippy`
-//! - PHP
-//!   - `phpmd`
-//!   - `phpcs`
-
 use regex::Regex;
 use std::process::Command;
 use std::path::PathBuf;
 use slog::{trace};
 use std::fs;
 use failure::Error;
-use failure::Fail;
 use regex::NoExpand;
 use serde::{Serialize, Deserialize};
 
@@ -249,12 +204,4 @@ pub fn get_changed_files(commit_range: &str) -> Result<Vec<PathBuf>, Error> {
         },
         false => panic!("Git error")
     }
-}
-
-#[derive(Debug, Fail)]
-pub enum LintError {
-    #[fail(display = "IO error")]
-    IO,
-    #[fail(display = "Parsing error")]
-    Parse
 }

@@ -54,13 +54,13 @@ extern crate xdg;
 extern crate toml;
 
 mod display;
+mod lint;
 
 use clap::{Arg, App, AppSettings};
 use std::process::{Command, Stdio};
 use slog::{Level, Logger, Drain, info, debug, trace, o};
 use slog_term::{TermDecorator, CompactFormat};
 use failure::Error;
-use lint_emit::*;
 use indicatif::{ProgressBar};
 use rayon::prelude::*;
 use colored::*;
@@ -69,6 +69,7 @@ use std::fs;
 use dialoguer::{theme::ColorfulTheme, Checkboxes};
 use serde::{Serialize, Deserialize};
 use std::io::Write;
+use lint::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Config {
