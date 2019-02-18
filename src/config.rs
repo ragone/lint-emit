@@ -5,11 +5,13 @@ use failure::Error;
 use serde::{Serialize, Deserialize};
 use crate::lint::*;
 
+/// The config
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub linters: Option<Vec<LinterConfig>>
 }
 
+/// Get the config or create a new config in xdg path
 pub fn get_config() -> Result<Config, Error> {
     // Determine if a config file exists, otherwise create it
     let xdg_dirs = xdg::BaseDirectories::with_prefix("lint-emit").unwrap();
