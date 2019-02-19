@@ -1,3 +1,7 @@
+<a href="https://travis-ci.org/ragone/lint-emit"><img src="https://img.shields.io/travis/ragone/lint-emit.svg"></a>
+<a href="https://github.com/ragone/lint-emit/blob/master/LICENSE.md"><img src="https://img.shields.io/crates/l/lint-emit.svg"></a>
+<a href="https://crates.io/crates/lint-emit"><img src="https://img.shields.io/crates/v/lint-emit.svg"></a>
+
 This tool aims to run **multiple** linters on a commit range compatible with `git`.                                                                                         
                                                                                                                                                                             
 Inspired by [lint-diff](https://github.com/grvcoelho/lint-diff) and [lint-staged](https://github.com/okonet/lint-staged)                                                    
@@ -53,3 +57,4 @@ $ lint-emit
 ```shell                                                                                                                                                                    
 $ lint-emit --linters phpmd phpcs                                                                                                                                           
 ```                                                                                                                                                                         
+
