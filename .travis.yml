@@ -12,14 +12,14 @@ env:
 
 matrix:
   include:
-    # # Android
+    # Android
     # - env: TARGET=aarch64-linux-android DISABLE_TESTS=1
     # - env: TARGET=arm-linux-androideabi DISABLE_TESTS=1
     # - env: TARGET=armv7-linux-androideabi DISABLE_TESTS=1
     # - env: TARGET=i686-linux-android DISABLE_TESTS=1
     # - env: TARGET=x86_64-linux-android DISABLE_TESTS=1
 
-    # # iOS
+    # iOS
     # - env: TARGET=aarch64-apple-ios DISABLE_TESTS=1
     #   os: osx
     # - env: TARGET=armv7-apple-ios DISABLE_TESTS=1
@@ -55,12 +55,18 @@ matrix:
       os: osx
 
     # *BSD
-    - env: TARGET=i686-unknown-freebsd DISABLE_TESTS=1
-    - env: TARGET=x86_64-unknown-freebsd DISABLE_TESTS=1
-    - env: TARGET=x86_64-unknown-netbsd DISABLE_TESTS=1
+    # - env: TARGET=i686-unknown-freebsd DISABLE_TESTS=1
+    # - env: TARGET=x86_64-unknown-freebsd DISABLE_TESTS=1
+    # - env: TARGET=x86_64-unknown-netbsd DISABLE_TESTS=1
 
     # Windows
     - env: TARGET=x86_64-pc-windows-gnu
+
+    - env: TARGET=i686-pc-windows-gnu
+    - env: TARGET=x86_64-pc-windows-gnu
+
+    - env: TARGET=i686-pc-windows-msvc
+    - env: TARGET=x86_64-pc-windows-msvc
 
     # Bare metal
     # These targets don't support std and as such are likely not suitable for
