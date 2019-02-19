@@ -7,9 +7,17 @@ Inspired by [lint-diff](https://github.com/grvcoelho/lint-diff) and [lint-staged
                                                                                                                                                                             
 > `lint-emit` receives a commit range and uses the specified linters to lint the changed files and filter only the errors introduced in the commit range (and nothing more).
                                                                                                                                                                             
-# Configuration                                                                                                                                                             
-You can add a linter by editing the config file found in your xdg path.                                                                                                     
+# Configuration                                                                                                             
+You can add a linter by editing the config file found in your user path.                                                                                                     
+Linux: `/home/alice/.config/lint-emit`
+
+Windows: `C:\Users\Alice\AppData\Roaming\ragone\lint-emit`
+
+macOS:   `/Users/Alice/Library/Preferences/io.ragone.lint-emit`
+
 If no config file is found, you will be asked which default linters you would like to add.                                                                                  
+
+                                                                                 
 ```toml                                                                                                                                                                     
 [[linters]]                                                                                                                                                                 
 name = "eslint"                                                                                                                                                             
