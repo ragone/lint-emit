@@ -24,40 +24,31 @@ pub fn get_config() -> Result<Config, Error> {
         // Get the default config
         let default_config: Config = toml::from_str(include_str!("default_config.toml"))?;
         let linters = default_config.linters.unwrap();
+        // Prompt user to select linters
+        let linter_names: Vec<&str> = linters
+            .iter()
+            .map(|linter| linter.name.as_str())
+            .collect();
 
-        let selected_linters: Vec<LinterConfig> = match cfg!(windows) {
-            true => {
-                // Include all default linters
-                linters.clone()
-            },
-            false => {
-                // Prompt user to select linters
-                let linter_names: Vec<&str> = linters
-                    .iter()
-                    .map(|linter| linter.name.as_str())
-                    .collect();
+        let selections = Checkboxes::with_theme(&ColorfulTheme::default())
+            .with_prompt("Choose linters [Press SPACE to select]")
+            .items(&linter_names)
+            .interact()
+            .unwrap();
 
-                let selections = Checkboxes::with_theme(&ColorfulTheme::default())
-                    .with_prompt("Choose linters [Press SPACE to select]")
-                    .items(&linter_names)
-                    .interact()
-                    .unwrap();
+        let selected_names: Vec<&str> = selections
+            .into_iter()
+            .filter_map(|selection| linter_names.get(selection))
+            .map(|selection| *selection)
+            .collect();
 
-                let selected_names: Vec<&str> = selections
-                    .into_iter()
-                    .filter_map(|selection| linter_names.get(selection))
-                    .map(|selection| *selection)
-                    .collect();
-
-                linters
-                    .clone()
-                    .into_iter()
-                    .filter(|linter| {
-                        selected_names.contains(&linter.name.as_str())
-                    })
-                    .collect()
-            }
-        };
+        let selected_linters: Vec<LinterConfig> = linters
+            .clone()
+            .into_iter()
+            .filter(|linter| {
+                selected_names.contains(&linter.name.as_str())
+            })
+            .collect();
 
         let new_config = Config {
             linters: Some(selected_linters)
