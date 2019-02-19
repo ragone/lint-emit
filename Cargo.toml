@@ -5,6 +5,14 @@ license = "MIT"
 description = "Lint your git diffs!"
 authors = ["Alex Ragone <alex.ragone@ezyvet.com>"]
 edition = "2018"
+repository="https://github.com/ragone/lint-emit"
+maintenance = { status = "passively-maintained" }
+readme = "README.md"
+keywords = ["linter", "diff", "lint", "git", "staged"]
+categories = ["command-line-utilities"]
+
+[badges]
+travis-ci = { repository = "ragone/lint-emit", branch = "master" }
 
 [dependencies]
 clap = "2"
