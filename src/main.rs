@@ -51,8 +51,8 @@ extern crate itertools;
 extern crate walkdir;
 extern crate serde;
 extern crate dialoguer;
-extern crate xdg;
 extern crate toml;
+extern crate directories;
 
 pub mod config;
 mod lint;
